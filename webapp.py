@@ -8,12 +8,26 @@ import os
 # Page config
 st.set_page_config(page_title="Virtual Snap Gauge Simulator", layout="wide")
 
-# Take input from user for number of batches and samples per batch
+# 📌 Objective and Procedure Display
+with st.expander("📌 Objective and Procedure", expanded=True):
+    st.markdown("""
+    **🎯 Objective:**  
+    Simulate inspection of spheres using a virtual Snap Gauge and analyze quality through batch-wise testing and P Chart.
+
+    **🧪 Procedure:**  
+    1. Enter number of batches and samples per batch.  
+    2. Click spheres one by one to test inside the Snap Gauge.  
+    3. Only accepted spheres within **49.5 mm–50.5 mm** are marked **Go**, else **No Go**.  
+    4. Complete each batch before moving to the next.  
+    5. View **P Chart** after all batches are done.
+    """)
+
+# Input section
 st.markdown("### Please input the following parameters:")
 no_of_batches = st.number_input("No of Batches:", min_value=1, value=5)
 no_of_samples_per_batch = st.number_input("No of Samples per Batch:", min_value=1, value=5)
 
-# Display title after inputs
+# Display title
 st.title("🔧 Virtual Snap Gauge Simulator")
 
 # Constants
@@ -28,16 +42,15 @@ SNAP_GAUGE_IMG = "snap_gauge_image.jpeg"
 
 # Initialize session state
 if "spheres" not in st.session_state:
-    # Update the number of spheres based on the input values
     st.session_state.spheres = [round(random.uniform(49.3, 50.7), 2) for _ in range(no_of_batches * no_of_samples_per_batch)]
     st.session_state.selected_sphere_index = None
     st.session_state.selected = []
     st.session_state.batches = []
 
 if "completed_batches" not in st.session_state:
-    st.session_state.completed_batches = 0  # Track the number of completed batches
+    st.session_state.completed_batches = 0
 
-# Layout: Use a fixed left column for the Snap Gauge image
+# Layout
 col1, col2 = st.columns([1, 5])
 
 with col1:
@@ -76,24 +89,21 @@ with col2:
             else:
                 st.warning("You have already completed the maximum number of batches.")
 
-    # Display current batch results
     if st.session_state.selected:
         st.subheader("📋 Current Batch Results")
         for i, (d, r) in enumerate(st.session_state.selected):
             st.markdown(f"- **Sphere {i+1}**: {d} mm → {r}")
 
-    # Complete batch after filling up to "No of Samples per Batch"
     if len(st.session_state.selected) == no_of_samples_per_batch:
         st.success("✅ Batch complete!")
         st.session_state.batches.append(st.session_state.selected)
         st.session_state.selected = []
         st.session_state.completed_batches += 1
 
-# ✅ Show final results *only after all batches are used*
+# ✅ Final Results
 if st.session_state.completed_batches == no_of_batches:
     st.subheader("📈 Final P Chart and Batch Results")
 
-    # Calculate chart data
     batch_sizes = [len(batch) for batch in st.session_state.batches]
     defective_counts = [sum(1 for _, result in batch if result == "No Go") for batch in st.session_state.batches]
     proportions = [defective / size for defective, size in zip(defective_counts, batch_sizes)]
@@ -102,7 +112,6 @@ if st.session_state.completed_batches == no_of_batches:
     ucl = avg_p + 3 * np.sqrt((avg_p * (1 - avg_p)) / np.mean(batch_sizes))
     lcl = max(0, avg_p - 3 * np.sqrt((avg_p * (1 - avg_p)) / np.mean(batch_sizes)))
 
-    # Prepare the chart
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.plot(proportions, marker='o', linestyle='-', color='blue', label="P Chart")
     ax.axhline(y=avg_p, color='red', linestyle='dashed', label="CL")
@@ -119,21 +128,18 @@ if st.session_state.completed_batches == no_of_batches:
     ax.set_ylabel("Defective Proportion")
     ax.legend()
 
-    # Side-by-side display
     chart_col, data_col = st.columns(2)
 
     with chart_col:
         st.pyplot(fig)
 
     with data_col:
-        # Create a dataframe for all batches and their results
         df = pd.DataFrame(
             [(i + 1, diameter, result) for i, batch in enumerate(st.session_state.batches) for (diameter, result) in batch],
             columns=["Batch", "Diameter (mm)", "Result"]
         )
         st.dataframe(df)
 
-        # Save results to files
         os.makedirs("results", exist_ok=True)
         excel_path = "results/snap_gauge_results.xlsx"
         csv_path = "results/snap_gauge_results.csv"
